@@ -5,9 +5,6 @@ const SB_URL="https://ngvrqywloulzdacwxfav.supabase.co";
 const SB_KEY="sb_publishable_t1MbfKSq-azS6W93oA4GxA_iO18yk7B";
 const sbLoad=async(table)=>{try{const r=await fetch(`${SB_URL}/rest/v1/${table}?select=*&order=id.asc`,{headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`}});const rows=await r.json();return rows&&rows.length>0?rows[0].data:null;}catch{return null;}};
 const sbSave=async(table,data)=>{try{const r=await fetch(`${SB_URL}/rest/v1/${table}?select=id&limit=1`,{headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`}});const rows=await r.json();const method=rows&&rows.length>0?"PATCH":"POST";const url=rows&&rows.length>0?`${SB_URL}/rest/v1/${table}?id=eq.${rows[0].id}`:`${SB_URL}/rest/v1/${table}`;await fetch(url,{method,headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({data})});}catch(e){console.error(e);}};
-// Usuários ficam no Supabase para compartilhar entre dispositivos
-const sbLoadUsers=async()=>{try{const r=await fetch(`${SB_URL}/rest/v1/usuarios?select=*&order=id.asc`,{headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`}});const rows=await r.json();return rows&&rows.length>0?rows[0].data:null;}catch{return null;}};
-const sbSaveUsers=async(data)=>{try{const r=await fetch(`${SB_URL}/rest/v1/usuarios?select=id&limit=1`,{headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`}});const rows=await r.json();const method=rows&&rows.length>0?"PATCH":"POST";const url=rows&&rows.length>0?`${SB_URL}/rest/v1/usuarios?id=eq.${rows[0].id}`:`${SB_URL}/rest/v1/usuarios`;await fetch(url,{method,headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({data})});}catch(e){console.error(e);}};
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 const TH={
@@ -826,16 +823,16 @@ export default function App(){
   const [fin,setFinState]=useState([]);
   const [caixa,setCaixaState]=useState([]);
   const [notifs,setNotifsState]=useState([]);
-  const [users,setUsersState]=useState(DEF_USERS);
+  const [users,setUsers]=useState(DEF_USERS);
 
   useEffect(()=>{try{localStorage.setItem("cv5_dark",JSON.stringify(dark));}catch{}},[dark]);
 
   useEffect(()=>{
     const loadAll=async()=>{
       try{
-        const [emp,cli,col,prod,ped,f,cx,usr]=await Promise.all([sbLoad("empresa"),sbLoad("clientes"),sbLoad("colaboradores"),sbLoad("produtos"),sbLoad("pedidos"),sbLoad("financeiro"),sbLoad("caixa"),sbLoadUsers()]);
+        const [emp,cli,col,prod,ped,f,cx,usr]=await Promise.all([sbLoad("empresa"),sbLoad("clientes"),sbLoad("colaboradores"),sbLoad("produtos"),sbLoad("pedidos"),sbLoad("financeiro"),sbLoad("caixa"),sbLoad("usuarios")]);
         if(emp)setEmpresaState(emp);if(cli)setClientesState(cli);if(col)setColabsState(col);if(prod)setProdutosState(prod);if(ped)setPedidosState(ped);if(f)setFinState(f);if(cx)setCaixaState(cx);
-        if(usr&&usr.length>0)setUsersState(usr);
+        if(usr&&Array.isArray(usr)&&usr.length>0)setUsers(usr);
         setSyncStatus("ok");
       }catch(e){console.error(e);setSyncStatus("erro");}
       setLoaded(true);
@@ -850,9 +847,7 @@ export default function App(){
   useEffect(()=>{if(loaded)sbSave("pedidos",pedidos).catch(()=>setSyncStatus("erro"));},[pedidos,loaded]);
   useEffect(()=>{if(loaded)sbSave("financeiro",fin).catch(()=>setSyncStatus("erro"));},[fin,loaded]);
   useEffect(()=>{if(loaded)sbSave("caixa",caixa).catch(()=>setSyncStatus("erro"));},[caixa,loaded]);
-  useEffect(()=>{if(loaded)sbSaveUsers(users).catch(()=>setSyncStatus("erro"));},[users,loaded]);
-
-  const setUsers=useCallback((val)=>{setUsersState(val);},[]);
+  useEffect(()=>{if(loaded)sbSave("usuarios",users).catch(()=>setSyncStatus("erro"));},[users,loaded]);
 
   const addNotif=useCallback(msg=>setNotifsState(ns=>[{id:Date.now(),msg,hora:new Date().toLocaleString("pt-BR"),lida:false},...ns].slice(0,40)),[]);
   const clearNotifs=useCallback(()=>setNotifsState([]),[]);
@@ -867,11 +862,7 @@ export default function App(){
     <style>{`@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
   </div>;
 
-  if(!user)return <Login onLogin={u=>{
-    // Busca sempre a versão mais atualizada do usuário no Supabase
-    const saved=users.find(x=>x.email===u.email);
-    setUser(saved||u);setPage("dashboard");
-  }} t={t} users={users} empresa={empresa}/>;
+  if(!user)return <Login onLogin={u=>{const saved=users.find(x=>x.email===u.email);setUser(saved||u);setPage("dashboard");}} t={t} users={users} empresa={empresa}/>;
   const role=user.role;
   const perm=role==="admin"?PERM_ROLES.admin:(user.permissoes||PERM_ROLES[role]||{});
   const canEdit=role==="admin"||role==="comercial";
